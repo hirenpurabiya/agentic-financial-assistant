@@ -493,8 +493,7 @@ with gr.Blocks(title="Agentic Financial Assistant") as app:
                 elem_id="chatbox",
                 height=520,
                 placeholder=(
-                    "Ask in text or voice — click the mic to speak (up to 5s). "
-                    "Powered by Gemini 2.5 Flash for STT, LLM, and TTS."
+                    "Ask in text or voice. Click the mic to speak (up to 5 seconds)."
                 ),
                 layout="bubble",
             )
