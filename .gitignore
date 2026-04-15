@@ -1,0 +1,37 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Private project files
+CLAUDE.md
+.cursorrules
+jupyter_files/
+
+# Logs
+*.log
+
+# ChromaDB persistence (if any)
+chroma_db/
+.chroma/
