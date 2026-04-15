@@ -258,15 +258,23 @@ def voice_chat(audio_path: str | None, history: list, thread_id: str):
         ]
         return history, thread_id, None, None
 
-    history = history + [{"role": "assistant", "content": answer}]
-
     # 3. TTS (graceful fallback: text remains even if TTS fails).
+    # Gemini preview TTS can 500 transiently. synthesize() retries; if it still
+    # fails, append a brief note so the user sees why audio did not play and
+    # knows a retry will probably succeed, rather than assuming voice is broken.
+    tts_note = ""
     try:
         sr, audio = synthesize(answer)
         audio_out = (sr, audio)
     except Exception:
-        logger.exception("TTS failed")
+        logger.exception("TTS failed after retries")
         audio_out = None
+        tts_note = (
+            "\n\n_Voice playback is temporarily unavailable. "
+            "Try the mic again in a moment._"
+        )
+
+    history = history + [{"role": "assistant", "content": answer + tts_note}]
 
     # Return mic_clear=None so the Audio component resets for the next recording.
     return history, thread_id, audio_out, None
