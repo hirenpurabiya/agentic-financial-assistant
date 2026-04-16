@@ -7,6 +7,7 @@ were dispatched for each query and visualizes the LangGraph architecture.
 
 from __future__ import annotations
 
+import threading
 import time
 import uuid
 
@@ -18,19 +19,81 @@ from src.graph import graph
 
 
 # --- Abuse protection ---
+#
+# Three layers protect the demo from accidental and malicious overuse:
+#
+#   1. Per-session quota (TEXT_MAX_PER_HOUR / VOICE_MAX_PER_HOUR): stops a
+#      single user or scripted client tied to one Gradio session from burning
+#      through API credits.
+#   2. Global hourly backstop (GLOBAL_MAX_QUERIES_PER_HOUR): catches the
+#      "attacker spins up many fresh sessions" pattern, which the per-session
+#      quota alone would not stop. Voice and text share this budget because
+#      they hit the same paid API.
+#   3. Inter-call pacing (CALL_DELAY / VOICE_CALL_DELAY): smooths bursts so
+#      one runaway loop does not pin upstream rate limits.
+#
+# Numbers are intentionally generous for real users (a normal demo session is
+# well under 30 queries) and tight enough to make scripted abuse uneconomical.
 
 MAX_INPUT_CHARS = 500
 CALL_DELAY = 2
+
+TEXT_MAX_PER_HOUR = 30  # per thread/session
 
 # Voice-specific limits: stricter because STT + LLM + TTS = 3 Gemini calls per turn.
 VOICE_MAX_SECONDS = 5
 VOICE_MAX_PER_HOUR = 10  # per thread/session
 VOICE_CALL_DELAY = 3
 
+# Global backstop across all sessions. Set so the demo's worst-hour cost stays
+# bounded even if a hundred fresh sessions hit at once.
+GLOBAL_MAX_QUERIES_PER_HOUR = 200
 
+
+_lock = threading.Lock()
 _last_call = {"ts": 0.0}
 _last_voice_call = {"ts": 0.0}
+_text_buckets: dict[str, list[float]] = {}
 _voice_buckets: dict[str, list[float]] = {}
+_global_bucket: list[float] = []
+
+
+def _check_global_budget(now: float) -> tuple[bool, str]:
+    """Enforce the cross-session hourly cap. Caller must hold _lock."""
+    cutoff = now - 3600
+    _global_bucket[:] = [t for t in _global_bucket if t > cutoff]
+    if len(_global_bucket) >= GLOBAL_MAX_QUERIES_PER_HOUR:
+        return False, (
+            "This demo is at capacity right now. Please try again in a few "
+            "minutes. Code and architecture are linked above."
+        )
+    return True, ""
+
+
+def _rate_limit_chat(thread_id: str) -> tuple[bool, str]:
+    """Enforce per-session text quota plus the global backstop.
+
+    Returns (allowed, reason). Pacing (CALL_DELAY) is applied separately by
+    _rate_limit() so the user-facing quota check stays a fast O(1) decision.
+    """
+    now = time.time()
+    with _lock:
+        ok, reason = _check_global_budget(now)
+        if not ok:
+            return False, reason
+
+        bucket = _text_buckets.setdefault(thread_id, [])
+        cutoff = now - 3600
+        bucket[:] = [t for t in bucket if t > cutoff]
+        if len(bucket) >= TEXT_MAX_PER_HOUR:
+            return False, (
+                f"Session limit reached ({TEXT_MAX_PER_HOUR} queries/hour). "
+                "Start a new chat or try again later."
+            )
+
+        bucket.append(now)
+        _global_bucket.append(now)
+    return True, ""
 
 
 def _rate_limit() -> None:
@@ -42,7 +105,7 @@ def _rate_limit() -> None:
 
 
 def _rate_limit_voice(thread_id: str) -> tuple[bool, str]:
-    """Enforce per-session voice quota. Returns (allowed, reason)."""
+    """Enforce per-session voice quota plus the global backstop."""
     now = time.time()
 
     # Global pacing between voice calls (coarse anti-burst).
@@ -50,17 +113,23 @@ def _rate_limit_voice(thread_id: str) -> tuple[bool, str]:
     if elapsed < VOICE_CALL_DELAY:
         time.sleep(VOICE_CALL_DELAY - elapsed)
 
-    bucket = _voice_buckets.setdefault(thread_id, [])
-    cutoff = time.time() - 3600
-    bucket[:] = [t for t in bucket if t > cutoff]
-    if len(bucket) >= VOICE_MAX_PER_HOUR:
-        return False, (
-            f"Voice limit reached ({VOICE_MAX_PER_HOUR}/hour). "
-            "Try text chat or try again later."
-        )
+    with _lock:
+        ok, reason = _check_global_budget(time.time())
+        if not ok:
+            return False, reason
 
-    bucket.append(time.time())
-    _last_voice_call["ts"] = time.time()
+        bucket = _voice_buckets.setdefault(thread_id, [])
+        cutoff = time.time() - 3600
+        bucket[:] = [t for t in bucket if t > cutoff]
+        if len(bucket) >= VOICE_MAX_PER_HOUR:
+            return False, (
+                f"Voice limit reached ({VOICE_MAX_PER_HOUR}/hour). "
+                "Try text chat or try again later."
+            )
+
+        bucket.append(time.time())
+        _global_bucket.append(time.time())
+        _last_voice_call["ts"] = time.time()
     return True, ""
 
 
@@ -92,6 +161,14 @@ def chat(message: str, history: list, thread_id: str):
 
     if not thread_id:
         thread_id = str(uuid.uuid4())
+
+    ok, reason = _rate_limit_chat(thread_id)
+    if not ok:
+        history = history + [
+            {"role": "user", "content": message},
+            {"role": "assistant", "content": reason},
+        ]
+        return history, thread_id, ""
 
     _rate_limit()
 
