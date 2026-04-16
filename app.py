@@ -504,16 +504,16 @@ answers together into one clean reply.
 
 ### The team
 
-- **Market Agent** pulls live stock prices, valuations, and trading volume from yfinance.
-- **Research Agent** searches the live web for news, earnings, and analyst commentary via Tavily.
+- **Market Agent** pulls live stock prices, valuations, and trading volume from Yahoo Finance.
+- **Research Agent** searches the live web for news, earnings, and analyst commentary using Tavily.
 - **Advisory Agent** answers educational questions using a curated knowledge base of investing and tax concepts, retrieved with embeddings from a vector database (ChromaDB).
 
 ### How a question flows
 
-1. The **Orchestrator** reads the question and returns a structured plan (which agents, what to ask each).
+1. The **Orchestrator** reads the question and returns a structured plan that specifies which agents to run and what to ask each one.
 2. Selected agents run **in parallel**, each with its own tools.
 3. The **Synthesizer** merges the outputs into one answer.
-4. State is checkpointed per conversation thread, so follow-ups have memory.
+4. Conversation context is preserved across turns, so follow up questions have full memory of earlier discussion.
 
 ### Routing in practice
 
@@ -525,50 +525,50 @@ answers together into one clean reply.
 ### Stack
 
 LangGraph (graph and state), Google Gemini 2.5 Flash (reasoning), Google
-embeddings and ChromaDB (retrieval), yfinance (markets), Tavily (web search).
-Voice uses Gemini 2.5 Flash for speech to text and gemini-2.5-flash-preview-tts
-(Kore voice) for text to speech.
+embeddings and ChromaDB (retrieval), Yahoo Finance (markets), Tavily (web
+search). Voice uses Gemini 2.5 Flash for both speech to text and text to speech.
 
-The architecture is **model agnostic**. The LLM and embedding layers are
-swappable, so the same system can run on OpenAI, Anthropic, or AWS Bedrock
-with a config change.
+The architecture is **model agnostic**. The language model, embedding model,
+and speech provider can each be substituted without rewriting the rest of the
+system, so it can run on OpenAI, Anthropic, or AWS Bedrock as needs evolve.
 """
 
 ABOUT_MD = """
 ### What this is
 
-A production style multi agent assistant for financial questions.
+A conversational, voice enabled multi agent assistant for financial questions.
 Ask about a stock, today's market news, or core investing concepts, and the
-right specialist answers. Works in both text and voice.
+right specialist answers. The assistant works in both text and voice, so you
+can type a question or speak it and hear the answer read back.
 
 ### Why it matters
 
 - **One interface, many capabilities.** Live market data, live news, and
-  curated financial education in a single conversation.
-- **Faster answers.** When a question needs two perspectives, the agents run
-  in parallel instead of one after the other.
-- **Grounded in real data.** Every number and headline comes from a live API
-  or a curated knowledge base. No synthetic content.
-- **Portable.** The design is model agnostic, so it can be deployed on any
-  major LLM provider without rewriting the application. The LLM layer can
-  swap to OpenAI, Anthropic, or Amazon Bedrock; the voice layer can swap to
-  Amazon Transcribe and Polly, or OpenAI Whisper and TTS.
+  curated financial education are all accessible in a single conversation.
+- **Faster answers through parallel execution.** When a question needs two
+  perspectives, the agents run at the same time instead of one after the other.
+- **Grounded in real world data.** Every number and headline comes from a live
+  API or a curated knowledge base, not the model's training memory.
+- **Language model agnostic by design.** The language model, embedding model,
+  and speech provider can each be substituted without rewriting the rest of the
+  system, so it can run on OpenAI, Anthropic, or AWS Bedrock as needs evolve.
 
 ### What it demonstrates, technically
 
 - Multi agent orchestration on **LangGraph**, with a classifier that dispatches
   specialists and a synthesizer that merges their outputs.
 - **Parallel agent execution**, tool calling, and structured output with
-  Pydantic for deterministic routing.
-- **RAG** over a curated financial knowledge base using Google embeddings and
-  ChromaDB.
-- **Conversation memory** via checkpointing per thread.
-- **Voice** with Gemini 2.5 Flash for STT and TTS, integrated into the same
-  chat surface.
+  Pydantic so each query is routed to the correct agents consistently.
+- **Retrieval augmented generation** over a curated financial knowledge base
+  using Google embeddings and ChromaDB.
+- **Conversation memory** that preserves context across turns, so follow up
+  questions have full awareness of earlier discussion.
+- **Voice** with Gemini 2.5 Flash for speech to text and text to speech,
+  integrated into the same chat surface.
 
 ### Data sources
 
-- **Live stock data**: yfinance
+- **Live stock data**: Yahoo Finance
 - **Live web news**: Tavily
 - **Financial education corpus**: 16 original entries written for this project
 
