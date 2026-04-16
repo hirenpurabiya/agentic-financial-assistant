@@ -318,13 +318,26 @@ footer { display: none !important; }
     color: var(--body-text-color-subdued, #475569);
     font-size: 1rem;
     margin-top: 0;
-    max-width: 960px;
     line-height: 1.55;
 }
 /* Defense in depth: hard-code safe colors per mode if the CSS var is ever
    unavailable (e.g. custom theme override). */
 html:not(.dark) #subtitle { color: #334155; }
 html.dark #subtitle { color: #cbd5e1; }
+/* Disclaimer: visible but understated. Slightly muted, italic, smaller than
+   the subtitle, with a thin left border so it reads as an advisory note
+   rather than primary copy. */
+#disclaimer {
+    margin: 0.5rem 0 0 0;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.88rem;
+    font-style: italic;
+    line-height: 1.5;
+    border-left: 3px solid var(--border-color-accent, #94a3b8);
+    color: var(--body-text-color-subdued, #475569);
+}
+html:not(.dark) #disclaimer { color: #475569; border-left-color: #94a3b8; }
+html.dark #disclaimer { color: #94a3b8; border-left-color: #475569; }
 #chatbox { border-radius: 14px; }
 .gr-button-primary {
     background: linear-gradient(90deg, #059669 0%, #0d9488 100%) !important;
@@ -390,9 +403,17 @@ HEADER_MD = """
 </div>
 
 <p id="subtitle">
-A multi agent LangGraph system. The Orchestrator classifies your query and
-dispatches one or more specialists in parallel. The Synthesizer merges their
-outputs into a single coherent answer. All data is real, zero synthetic content.
+A conversational, voice enabled multi agent system built on LangGraph. An
+Orchestrator agent classifies each query and dispatches specialist agents in
+parallel across live market data, live news, and a curated financial knowledge
+base. A Synthesizer merges their outputs into one coherent answer grounded in
+real world data.
+</p>
+
+<p id="disclaimer">
+This application is an educational demo, not financial advice. Always do your
+own research and consult a qualified professional before making any investment
+decision.
 </p>
 """
 
@@ -474,7 +495,12 @@ right specialist answers. Works in both text and voice.
 - **Live web news**: Tavily
 - **Financial education corpus**: 16 original entries written for this project
 
-_Educational information only. Not personalized financial advice._
+### Disclaimer
+
+This application is an educational demo, not financial advice. The Advisory
+Agent also appends a brief disclaimer to every response that touches on
+personal financial decisions. Always do your own research and consult a
+qualified professional before making any investment decision.
 """
 
 EXAMPLES = [
